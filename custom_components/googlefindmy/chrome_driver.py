@@ -3,7 +3,6 @@
 #  Copyright © 2024 Leon Böttger. All rights reserved.
 #
 
-import undetected_chromedriver as uc
 import os
 import shutil
 import platform
@@ -42,22 +41,28 @@ def find_chrome():
 
 
 def get_options(headless=False):
-    chrome_options = uc.ChromeOptions()
-    if not headless:
-        chrome_options.add_argument("--start-maximized")
-    else:
-        chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
+    try:
+        import undetected_chromedriver as uc
+        
+        chrome_options = uc.ChromeOptions()
+        if not headless:
+            chrome_options.add_argument("--start-maximized")
+        else:
+            chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--no-sandbox")
 
-    return chrome_options
+        return chrome_options
+    except Exception:
+        return None
 
 
 def create_driver(headless=False):
     """Create a Chrome WebDriver with undetected_chromedriver."""
 
     try:
+        import undetected_chromedriver as uc
         chrome_options = get_options(headless=headless)
         driver = uc.Chrome(options=chrome_options)
         print("[ChromeDriver] Installed and browser started.")
@@ -70,6 +75,7 @@ def create_driver(headless=False):
             chrome_options = get_options(headless=headless)
             chrome_options.binary_location = chrome_path
             try:
+                import undetected_chromedriver as uc
                 driver = uc.Chrome(options=chrome_options)
                 print(f"[ChromeDriver] ChromeDriver started using {chrome_path}")
                 return driver

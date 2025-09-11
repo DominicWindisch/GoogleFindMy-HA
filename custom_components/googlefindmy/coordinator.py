@@ -86,14 +86,15 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                         if location_data:
                             lat = location_data.get('latitude')
                             lon = location_data.get('longitude')
+                            semantic = location_data.get('semantic')
                             
                             # Simple validation - just check coordinates exist
-                            if lat is not None and lon is not None:
+                            if (lat is not None and lon is not None) or semantic:
                                 _LOGGER.info(f"Got location for {device_name}: lat={lat}, lon={lon}")
                                 self._device_location_data[device_id] = location_data
                                 self._device_location_data[device_id]["last_updated"] = current_time
                             else:
-                                _LOGGER.warning(f"Invalid coordinates for {device_name}: lat={lat}, lon={lon}")
+                                _LOGGER.warning(f"Invalid coordinates for {device_name}: lat={lat}, lon={lon}, semantic={semantic}")
                         else:
                             _LOGGER.warning(f"No location data returned for {device_name}")
                             
