@@ -33,7 +33,7 @@ class FcmReceiverHA:
         self._initialized = True
         
         self.credentials = None
-        self.location_update_callbacks = []
+        self.location_update_callbacks = {}
         self.pc = None
         self._listening = False
         self._listen_task = None
@@ -190,7 +190,7 @@ class FcmReceiverHA:
                 _LOGGER.info(f"Received FCM location response: {len(hex_string)} chars")
                 
                 # Call all registered callbacks asynchronously to avoid blocking
-                for callback in self.location_update_callbacks:
+                for callback in self.location_update_callbacks.values():
                     try:
                         # Run callback in executor to avoid blocking the event loop
                         asyncio.create_task(self._run_callback_async(callback, hex_string))
