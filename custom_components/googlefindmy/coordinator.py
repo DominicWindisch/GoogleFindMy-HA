@@ -86,7 +86,7 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                         if location_data:
                             lat = location_data.get('latitude')
                             lon = location_data.get('longitude')
-                            semantic = location_data.get('semantic')
+                            semantic = location_data.get('semantic_name')
                             
                             # Simple validation - just check coordinates exist
                             if (lat is not None and lon is not None) or semantic:
