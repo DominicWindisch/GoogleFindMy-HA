@@ -799,11 +799,19 @@ class FcmPushClient:  # pylint:disable=too-many-instance-attributes
 
                 self.do_listen = False
 
+                if self.writer and not self.writer.is_closing():
+                    try:
+                        await self._send_msg(Close())
+                        _logger.debug("Sent Close message to FCM server")
+                    except Exception as e:
+                        _logger.warning("Failed to send Close message: %s", e)
+
                 for task in self.tasks:
                     if not task.done():
                         task.cancel()
 
             finally:
+                await self._do_writer_close()
                 self.run_state = FcmPushClientRunState.STOPPED
                 self.fcm_thread = None
                 self.listen_event_loop = None

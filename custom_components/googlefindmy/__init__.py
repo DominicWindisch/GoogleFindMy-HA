@@ -18,6 +18,7 @@ import voluptuous as vol
 from .const import DOMAIN, CONF_OAUTH_TOKEN, SERVICE_LOCATE_DEVICE, SERVICE_PLAY_SOUND, SERVICE_LOCATE_EXTERNAL
 from .coordinator import GoogleFindMyCoordinator
 from .Auth.token_cache import async_load_cache_from_file
+from .Auth.fcm_receiver_ha import FcmReceiverHA 
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -163,6 +164,10 @@ async def async_update_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    fcm_receiver = FcmReceiverHA()
+    await fcm_receiver.async_stop()
+    _LOGGER.info("FCM receiver stopped.")
+
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
 
