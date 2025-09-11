@@ -33,7 +33,7 @@ class FcmReceiverHA:
         self._initialized = True
         
         self.credentials = None
-        self.location_update_callbacks = {}
+        self.location_update_callbacks : Dict[str, Callable] = {}
         self.pc = None
         self._listening = False
         self._listen_task = None
@@ -89,11 +89,20 @@ class FcmReceiverHA:
             _LOGGER.error(f"Failed to initialize FCM receiver: {e}")
             return False
     
-    async def async_register_for_location_updates(self, name: str, callback: Callable) -> Optional[str]:
+    async def async_unregister_for_location_updates(self, device_id: str):
+        """Unregister a callback for location updates by name."""
+        try:
+            if device_id in self.location_update_callbacks:
+                del self.location_update_callbacks[device_id]
+                _LOGGER.debug(f"Successfully unregistered location callback for {device_id}")
+        except Exception as e:
+            _LOGGER.error(f"Failed to unregister location update callback for {device_id}: {e}")
+
+    async def async_register_for_location_updates(self, device_id: str, callback: Callable) -> Optional[str]:
         """Register for location updates asynchronously."""
         try:
             # Add callback to list
-            self.location_update_callbacks[name] = callback
+            self.location_update_callbacks[device_id] = callback
             
             # If not listening, start listening
             if not self._listening:
@@ -186,16 +195,27 @@ class FcmReceiverHA:
                 
                 # Convert to hex string
                 hex_string = binascii.hexlify(decoded_bytes).decode('utf-8')
+
+                from custom_components.googlefindmy.ProtoDecoders.decoder import parse_device_update_protobuf
                 
-                _LOGGER.info(f"Received FCM location response: {len(hex_string)} chars")
+                device_update = parse_device_update_protobuf(hex_string)
                 
-                # Call all registered callbacks asynchronously to avoid blocking
-                for callback in self.location_update_callbacks.values():
+                response_canonic_id = None
+
+                if device_update.HasField("deviceMetadata") and device_update.deviceMetadata.identifierInformation.canonicIds.canonicId:
+                    # We assume the first ID in the protobuf is the primary one for routing
+                    response_canonic_id = device_update.deviceMetadata.identifierInformation.canonicIds.canonicId[0].id
+
+                # Find and trigger ONLY the specific callback for this device ID
+                if response_canonic_id and response_canonic_id in self.location_update_callbacks:
+                    _LOGGER.debug(f"Routing FCM message to callback for device ID: {response_canonic_id}")
                     try:
-                        # Run callback in executor to avoid blocking the event loop
+                        callback = self.location_update_callbacks[response_canonic_id]
                         asyncio.create_task(self._run_callback_async(callback, hex_string))
                     except Exception as e:
                         _LOGGER.error(f"Error scheduling FCM callback: {e}")
+                else:
+                    _LOGGER.debug(f"Received FCM message for an unknown or unregistered device ID: {response_canonic_id}")
             else:
                 _LOGGER.debug("FCM notification without location payload")
                 

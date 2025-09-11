@@ -45,15 +45,12 @@ async def get_location_data_for_device(canonic_device_id, name):
         received_location_data = {"data": None, "received": False}
 
         def location_callback(hex_response):
+            """This callback will now only be called with data for the correct device."""
             try:
                 logger.info(f"FCM callback triggered for {name}, processing response...")
-                logger.debug(f"FCM response length: {len(hex_response)} chars")
                 from custom_components.googlefindmy.ProtoDecoders.decoder import parse_device_update_protobuf
 
-                # Parse the hex response
                 device_update = parse_device_update_protobuf(hex_response)
-
-                # Decrypt the location data using the original method
                 location_data = decrypt_location_response_locations(device_update)
 
                 if location_data:
@@ -63,7 +60,6 @@ async def get_location_data_for_device(canonic_device_id, name):
                     logger.info(f"Successfully processed location data for {name}")
                 else:
                     logger.warning(f"No location data found after decryption for {name}")
-
             except Exception as callback_error:
                 logger.error(f"Error processing FCM callback for {name}: {callback_error}")
                 import traceback
@@ -82,7 +78,7 @@ async def get_location_data_for_device(canonic_device_id, name):
             
             logger.debug(f"FCM receiver initialized, registering for location updates for {name}...")
             # Register for location updates
-            fcm_token = await fcm_receiver.async_register_for_location_updates(name, location_callback)
+            fcm_token = await fcm_receiver.async_register_for_location_updates(canonic_device_id, location_callback)
             if not fcm_token:
                 logger.error(f"Failed to get FCM token for {name}")
                 return []
@@ -146,6 +142,12 @@ async def get_location_data_for_device(canonic_device_id, name):
         import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return []
+    finally:
+        if fcm_receiver:
+            try:
+                await fcm_receiver.async_unregister_for_location_updates(canonic_device_id)
+            except Exception as cleanup_error:
+                logger.warning(f"Error during FCM callback cleanup for {name}: {cleanup_error}")
 
 if __name__ == '__main__':
     get_location_data_for_device(get_example_data("sample_canonic_device_id"), "Test")
