@@ -89,11 +89,11 @@ class FcmReceiverHA:
             _LOGGER.error(f"Failed to initialize FCM receiver: {e}")
             return False
     
-    async def async_register_for_location_updates(self, callback: Callable) -> Optional[str]:
+    async def async_register_for_location_updates(self, name: str, callback: Callable) -> Optional[str]:
         """Register for location updates asynchronously."""
         try:
             # Add callback to list
-            self.location_update_callbacks.append(callback)
+            self.location_update_callbacks[name] = callback
             
             # If not listening, start listening
             if not self._listening:

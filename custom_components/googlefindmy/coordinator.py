@@ -124,7 +124,7 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                 
                 # Apply cached location data if available
                 if device["id"] in self._device_location_data:
-                    location_data = self._device_location_data[device["id"]]
+                    location_data = self._device_location_data[device["id"]].copy()
                     device_info.update(location_data)
                     _LOGGER.debug(f"Applied cached location for {device_info['name']}: lat={device_info.get('latitude')}, lon={device_info.get('longitude')}, acc={device_info.get('accuracy')}")
                     

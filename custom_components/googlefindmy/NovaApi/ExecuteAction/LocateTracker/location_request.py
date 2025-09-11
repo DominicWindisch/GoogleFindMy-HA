@@ -82,7 +82,7 @@ async def get_location_data_for_device(canonic_device_id, name):
             
             logger.debug(f"FCM receiver initialized, registering for location updates for {name}...")
             # Register for location updates
-            fcm_token = await fcm_receiver.async_register_for_location_updates(location_callback)
+            fcm_token = await fcm_receiver.async_register_for_location_updates(name, location_callback)
             if not fcm_token:
                 logger.error(f"Failed to get FCM token for {name}")
                 return []
