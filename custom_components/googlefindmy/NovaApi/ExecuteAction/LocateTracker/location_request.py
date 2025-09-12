@@ -37,6 +37,9 @@ async def get_location_data_for_device(canonic_device_id, name):
     logger = logging.getLogger(__name__)
     logger.info(f"GoogleFindMyTools: Requesting location data for {name}...")
 
+    fcm_receiver = None
+    location_callback = None
+
     try:
         # Generate request UUID
         request_uuid = generate_random_uuid()
@@ -121,14 +124,14 @@ async def get_location_data_for_device(canonic_device_id, name):
                 await asyncio.sleep(0.5)
         except asyncio.CancelledError:
             logger.info(f"Location request cancelled for {name}")
-            await fcm_receiver.async_stop()
+            #await fcm_receiver.async_stop()
             raise
 
         # Clean up
-        try:
-            await fcm_receiver.async_stop()
-        except Exception as cleanup_error:
-            logger.warning(f"Error during FCM cleanup for {name}: {cleanup_error}")
+        #try:
+        #    await fcm_receiver.async_stop()
+        #except Exception as cleanup_error:
+        #    logger.warning(f"Error during FCM cleanup for {name}: {cleanup_error}")
 
         if received_location_data["received"] and received_location_data["data"]:
             logger.info(f"Successfully received location data for {name}")
