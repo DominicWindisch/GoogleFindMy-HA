@@ -707,7 +707,10 @@ class FcmPushClient:  # pylint:disable=too-many-instance-attributes
                         await asyncio.sleep(1)
                     elif msg := await self._receive_msg():
                         await self._handle_message(msg)
-
+                except ConnectionResetError:
+                    _logger.debug("Connection reset by peer. This is often normal for long-lived connections. Resetting.")
+                    if self._try_increment_error_count(ErrorType.CONNECTION):
+                        await self._reset()
                 except (OSError, EOFError) as osex:
                     if (
                         isinstance(
