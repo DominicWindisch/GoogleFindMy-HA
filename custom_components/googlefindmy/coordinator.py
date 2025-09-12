@@ -8,6 +8,7 @@ import time
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.entity import generate_entity_id
 
 from .const import DOMAIN, UPDATE_INTERVAL
 from .api import GoogleFindMyAPI
@@ -15,7 +16,6 @@ from .location_recorder import LocationRecorder
 from .Auth.fcm_receiver_ha import FcmReceiverHA
 
 _LOGGER = logging.getLogger(__name__)
-
 
 class GoogleFindMyCoordinator(DataUpdateCoordinator):
     """Class to manage fetching Google Find My Device data."""
@@ -35,7 +35,6 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
         self._device_location_data = {}
         self._last_location_poll_time = 0
         self._device_names = {}
-        self._startup_complete = False
 
         self.location_recorder = LocationRecorder(hass)
 
@@ -48,7 +47,6 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
 
         self.fcm_receiver = FcmReceiverHA()
         self._fcm_initialized = False
-        self._location_events = {}
 
     async def _async_initialize_fcm(self):
         """Initialize the FCM receiver."""
@@ -62,8 +60,7 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Update data via library."""
         try:
-            if not self._fcm_initialized:
-                await self._async_initialize_fcm()
+            await self._async_initialize_fcm()
 
             all_devices = await self.hass.async_add_executor_job(self.api.get_basic_device_list)
 
@@ -84,6 +81,7 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                 self._last_location_poll_time = current_time
 
             if should_poll_location and devices:
+                _LOGGER.debug("Starting location poll for %d devices", len(devices))
                 for i, device in enumerate(devices):
                     device_id = device["id"]
                     device_name = device["name"]
@@ -96,51 +94,35 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                         location_data = await self.api.async_get_device_location(device_id, device_name)
 
                         if location_data:
-                            lat = location_data.get('latitude')
-                            lon = location_data.get('longitude')
-                            accuracy = location_data.get('accuracy')
-                            semantic = location_data.get('semantic_name')
-
                             config_data = self.hass.data.get(DOMAIN, {}).get("config_data", {})
                             min_accuracy_threshold = config_data.get("min_accuracy_threshold", 100)
 
-                            if lat is not None and lon is not None or semantic:
-                                if accuracy is not None and accuracy > min_accuracy_threshold:
-                                    _LOGGER.debug(f"Filtering out location for {device_name}: accuracy {accuracy}m exceeds threshold {min_accuracy_threshold}m")
+                            if (location_data.get('latitude') is not None and location_data.get('longitude') is not None) or location_data.get('semantic_name'):
+                                if location_data.get('accuracy') is not None and location_data.get('accuracy') > min_accuracy_threshold:
+                                    _LOGGER.debug(f"Filtering out location for {device_name}: accuracy {location_data.get('accuracy')}m exceeds threshold {min_accuracy_threshold}m")
                                 else:
-                                    self._device_location_data[device_id] = location_data.copy()
-                                    self._device_location_data[device_id]["last_updated"] = current_time
+                                    # Use a consistent entity ID for history lookup
+                                    #entity_id = generate_entity_id("device_tracker.{}", f"{DOMAIN}_{device_name}", hass=self.hass)
+                                    entity_id = f"device_tracker.{device_name.lower().replace(' ', '_')}.{device_name.lower().replace(' ', '_')}"
+                                    
+                                    historical_locations = await self.location_recorder.get_location_history(entity_id, hours=24)
 
-                                    try:
-                                        entity_id = f"device_tracker.{DOMAIN}_{device_id}"
-                                        historical_locations = await self.location_recorder.get_location_history(entity_id, hours=24)
+                                    current_location_entry = {
+                                        'timestamp': location_data.get('last_seen', current_time),
+                                        'latitude': location_data.get('latitude'),
+                                        'longitude': location_data.get('longitude'),
+                                        'accuracy': location_data.get('accuracy'),
+                                        'semantic_name': location_data.get('semantic_name'),
+                                        'is_own_report': location_data.get('is_own_report', False),
+                                        'altitude': location_data.get('altitude')
+                                    }
+                                    historical_locations.insert(0, current_location_entry)
 
-                                        current_location_entry = {
-                                            'timestamp': location_data.get('last_seen', current_time),
-                                            'latitude': location_data.get('latitude'),
-                                            'longitude': location_data.get('longitude'),
-                                            'accuracy': location_data.get('accuracy'),
-                                            'semantic_name': location_data.get('semantic_name'),
-                                            'is_own_report': location_data.get('is_own_report', False),
-                                            'altitude': location_data.get('altitude')
-                                        }
-                                        historical_locations.insert(0, current_location_entry)
+                                    best_location = self.location_recorder.get_best_location(historical_locations)
 
-                                        best_location = self.location_recorder.get_best_location(historical_locations)
-
-                                        if best_location:
-                                            self._device_location_data[device_id].update({
-                                                'latitude': best_location.get('latitude'),
-                                                'longitude': best_location.get('longitude'),
-                                                'accuracy': best_location.get('accuracy'),
-                                                'altitude': best_location.get('altitude'),
-                                                'semantic_name': best_location.get('semantic_name'),
-                                                'is_own_report': best_location.get('is_own_report')
-                                            })
-                                    except Exception as e:
-                                        _LOGGER.debug(f"Recorder history lookup failed for {device_name}, using current data: {e}")
-                            else:
-                                _LOGGER.warning(f"Invalid coordinates/semantic location for {device_name}: lat={lat}, lon={lon}, semantic_name={semantic}")
+                                    if best_location:
+                                        self._device_location_data[device_id] = {**location_data, **best_location}
+                                        self._device_location_data[device_id]["last_updated"] = current_time
                         else:
                             _LOGGER.warning(f"No location data returned for {device_name}")
 
@@ -149,48 +131,21 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
 
                 self._last_location_poll_time = current_time
 
-            device_data = []
+            # Combine basic device info with latest location data
+            final_device_data = []
             for device in devices:
-                if device["id"] in self._device_location_data:
-                    device_info = self._device_location_data[device["id"]].copy()
-                    device_info.update({
-                        "name": device["name"],
-                        "id": device["id"],
-                        "device_id": device["id"],
-                        "status": "Using last known position"
-                    })
-                else:
-                    device_info = {
-                        "name": device["name"],
-                        "id": device["id"],
-                        "device_id": device["id"],
-                        "latitude": None,
-                        "longitude": None,
-                        "altitude": None,
-                        "accuracy": None,
-                        "last_seen": None,
-                        "status": "Waiting for location poll",
-                        "is_own_report": None,
-                        "semantic_name": None,
-                        "battery_level": None
-                    }
+                device_id = device["id"]
+                
+                # Start with the basic device info
+                device_info = device.copy()
+                
+                # Update with the latest cached location data if it exists
+                if device_id in self._device_location_data:
+                    device_info.update(self._device_location_data[device_id])
 
-                if device["id"] in self._device_location_data and "last_updated" in self._device_location_data[device["id"]]:
-                    cached_location = self._device_location_data[device["id"]].copy()
-                    device_info.update(cached_location)
+                final_device_data.append(device_info)
 
-                    last_updated = cached_location.get("last_updated", 0)
-                    data_age = current_time - last_updated
-                    if data_age < self.location_poll_interval:
-                        device_info["status"] = "Location data current"
-                    elif data_age < self.location_poll_interval * 2:
-                        device_info["status"] = "Location data aging"
-                    else:
-                        device_info["status"] = "Location data stale"
-
-                device_data.append(device_info)
-
-            return device_data
+            return final_device_data
 
         except Exception as exception:
             raise UpdateFailed(exception) from exception
