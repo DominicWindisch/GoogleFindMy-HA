@@ -126,7 +126,7 @@ class GoogleFindMyAPI:
             _LOGGER.info(f"DEBUG: get_location_data_for_device returned: {location_data}")
             
             if location_data and len(location_data) > 0:
-                _LOGGER.info(f"API v3.0: Got {len(location_data)} location records for {device_name}")
+                _LOGGER.info(f"API v3.0: Got {len(location_data)} location records for {device_name}, returning: {location_data[0]}")
                 # Return the most recent location
                 return location_data[0]
             else:
