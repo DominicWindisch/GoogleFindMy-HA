@@ -8,7 +8,7 @@ import time
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.helpers.entity import generate_entity_id
+from homeassistant.util import slugify
 
 from .const import DOMAIN, UPDATE_INTERVAL
 from .api import GoogleFindMyAPI
@@ -57,10 +57,18 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
             else:
                 _LOGGER.error("Failed to initialize FCM receiver.")
 
+    async def _async_shutdown(self):
+        """Stop the FCM listener when the integration is unloaded."""
+        if self._fcm_initialized:
+            await self.fcm_receiver.async_stop()
+            self._fcm_initialized = False
+            _LOGGER.info("Google Find My Device FCM listener shut down.")
+
     async def _async_update_data(self):
         """Update data via library."""
         try:
-            await self._async_initialize_fcm()
+            if not self._fcm_initialized:
+                await self._async_initialize_fcm()
 
             all_devices = await self.hass.async_add_executor_job(self.api.get_basic_device_list)
 
@@ -102,8 +110,7 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                                     _LOGGER.debug(f"Filtering out location for {device_name}: accuracy {location_data.get('accuracy')}m exceeds threshold {min_accuracy_threshold}m")
                                 else:
                                     # Use a consistent entity ID for history lookup
-                                    #entity_id = generate_entity_id("device_tracker.{}", f"{DOMAIN}_{device_name}", hass=self.hass)
-                                    entity_id = f"device_tracker.{device_name.lower().replace(' ', '_')}.{device_name.lower().replace(' ', '_')}"
+                                    entity_id = f"device_tracker.{DOMAIN}_{slugify(device_id)}"
                                     
                                     historical_locations = await self.location_recorder.get_location_history(entity_id, hours=24)
 
