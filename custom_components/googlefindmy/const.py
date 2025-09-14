@@ -1,6 +1,6 @@
 """Constants for Google Find My Device integration."""
 
-DOMAIN = "google_find_my_device"
+DOMAIN = "googlefindmy"
 
 # Configuration keys
 CONF_OAUTH_TOKEN = "oauth_token"

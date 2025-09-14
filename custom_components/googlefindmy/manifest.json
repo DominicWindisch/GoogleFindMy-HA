@@ -1,5 +1,5 @@
 {
-  "domain": "google_find_my_device",
+  "domain": "googlefindmy",
   "name": "Google Find My Device",
   "codeowners": ["@BSkando"],
   "config_flow": true,
@@ -28,5 +28,5 @@
     "undetected_chromedriver>=3.5.5",
     "selenium>=4.27.1"
   ],
-  "version": "1.5.2"
+  "version": "1.5.3"
 }
