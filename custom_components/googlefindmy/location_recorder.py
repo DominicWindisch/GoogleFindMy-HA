@@ -58,7 +58,7 @@ class LocationRecorder:
             # Sort by timestamp (newest first)
             locations.sort(key=lambda x: x['timestamp'], reverse=True)
             
-            _LOGGER.debug(f"Retrieved {len(locations)} historical locations from recorder")
+            _LOGGER.debug(f"Retrieved {len(locations)} historical locations for {entity_id} from recorder")
             return locations
             
         except Exception as e:

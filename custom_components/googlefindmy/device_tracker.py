@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .const import DOMAIN
 from .coordinator import GoogleFindMyCoordinator
@@ -45,6 +46,7 @@ class GoogleFindMyDeviceTracker(CoordinatorEntity, TrackerEntity):
         super().__init__(coordinator)
         self._device = device
         self._attr_unique_id = f"{DOMAIN}_{device['id']}"
+        self.entity_id = f"device_tracker.{DOMAIN}_{slugify(device['id'])}"
         self._attr_name = device["name"]
         self._attr_source_type = SourceType.GPS
         self._attr_has_entity_name = True
@@ -82,8 +84,10 @@ class GoogleFindMyDeviceTracker(CoordinatorEntity, TrackerEntity):
         if device_data:
             lat = device_data.get("latitude")
             lon = device_data.get("longitude")
+            semantic_name = device_data.get("semantic_name")
+
             # Available if we have both coordinates
-            return lat is not None and lon is not None
+            return (lat is not None and lon is not None) or (semantic_name is not None)
         return False
 
     @property
