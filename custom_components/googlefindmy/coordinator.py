@@ -125,7 +125,7 @@ class GoogleFindMyCoordinator(DataUpdateCoordinator):
                                     }
                                     historical_locations.insert(0, current_location_entry)
 
-                                    best_location = self.location_recorder.get_best_location(historical_locations)
+                                    best_location = current_location_entry #self.location_recorder.get_best_location(historical_locations)
 
                                     if best_location:
                                         self._device_location_data[device_id] = {**location_data, **best_location}
