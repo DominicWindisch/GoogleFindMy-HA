@@ -402,7 +402,15 @@ class FcmPushClient:  # pylint:disable=too-many-instance-attributes
         salt_str: str,
         raw_data: bytes,
     ) -> bytes:
-        crypto_key = urlsafe_b64decode(crypto_key_str.encode("ascii"))
+        missing_padding = len(crypto_key_str) % 4                         
+        if missing_padding:                                               
+            crypto_key_str += '=' * (4 - missing_padding)
+
+        try:
+            crypto_key = urlsafe_b64decode(crypto_key_str.encode("ascii"))
+        except binascii.Error as e:
+            _LOGGER.warning(f"Skipping FCM message with invalid crypto_key: {e}")
+            return # Skip this message instead of crashing
         salt = urlsafe_b64decode(salt_str.encode("ascii"))
         der_data_str = credentials["keys"]["private"]
         der_data = urlsafe_b64decode(der_data_str.encode("ascii") + b"========")
